@@ -115,13 +115,10 @@ function fetchLB(el){
     .catch(()=>{if(el)el.innerHTML='<div class="sdesc" style="opacity:0.5">Leaderboard unavailable</div>';});
 }
 
-// Post score to Google Sheet
+// Save score via GET (avoids CORS issues with Apps Script)
 function saveScore(name,score){
-  return fetch(SCRIPT_URL,{
-    method:'POST',
-    body:JSON.stringify({name,score}),
-    headers:{'Content-Type':'application/json'}
-  }).catch(()=>{});
+  const url=SCRIPT_URL+'?name='+encodeURIComponent(name)+'&score='+encodeURIComponent(score);
+  return fetch(url).catch(()=>{});
 }
 
 fetchLB(document.getElementById('lbList'));
@@ -374,9 +371,19 @@ function endGame(){
     <button class="sbtn" onclick="startGame()">Play Again!</button>`;
   s.style.display='flex';
   fid=requestAnimationFrame(loop);
-  // Save score then refresh leaderboard
-  saveScore(name,score).then(()=>fetchLB(document.getElementById('endLB')));
-  fetchLB(document.getElementById('endLB'));
+  // Save score via GET then fetch updated leaderboard
+  const saveUrl=SCRIPT_URL+'?name='+encodeURIComponent(name)+'&score='+encodeURIComponent(score);
+  fetch(saveUrl)
+    .then(r=>r.json())
+    .then(lb=>{
+      const el=document.getElementById('endLB');
+      if(!el)return;
+      if(!lb.length){el.innerHTML='<div class="sdesc" style="opacity:0.5">No scores yet!</div>';return;}
+      el.innerHTML=lb.slice(0,7).map((e,i)=>
+        `<div class="lbrow ${i===0?'gold':''}"><span>#${i+1} ${e.name}</span><span>${e.score}</span></div>`
+      ).join('');
+    })
+    .catch(()=>fetchLB(document.getElementById('endLB')));
 }
 
 document.getElementById('playBtn').onclick=startGame;
